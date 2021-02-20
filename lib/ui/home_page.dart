@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'package:giphyapp/ui/giphy_page.dart';
 import 'package:hexcolor/hexcolor.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:share/share.dart';
+import 'package:transparent_image/transparent_image.dart';
 
 class HomePage extends StatefulWidget {
   HomePage({Key key}) : super(key: key);
@@ -17,12 +20,12 @@ class _HomePageState extends State<HomePage> {
   Future<Map> _getGiphys() async {
     http.Response response;
 
-    if (_search == null)
+    if (_search == null || _search.isEmpty)
       response = await http.get(
           'https://api.giphy.com/v1/gifs/trending?api_key=qiKzqN14GzDl2Nj1wEQ6c7IpM6ISgBeD&limit=10&rating=g');
     else
       response = await http.get(
-          'https://api.giphy.com/v1/gifs/search?api_key=qiKzqN14GzDl2Nj1wEQ6c7IpM6ISgBeD&q=$_search&limit=10&offset=$_offset&rating=g&lang=en');
+          'https://api.giphy.com/v1/gifs/search?api_key=qiKzqN14GzDl2Nj1wEQ6c7IpM6ISgBeD&q=$_search&limit=9&offset=$_offset&rating=g&lang=en');
 
     return json.decode(response.body);
   }
@@ -59,6 +62,12 @@ class _HomePageState extends State<HomePage> {
                   border: OutlineInputBorder()),
               style: TextStyle(color: HexColor('#ffffff'), fontSize: 16),
               textAlign: TextAlign.center,
+              onSubmitted: (text) {
+                setState(() {
+                  _search = text;
+                  _offset = 0;
+                });
+              },
             ),
           ),
           Expanded(
@@ -92,6 +101,14 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  int _getCount(List data) {
+    if (_search == null) {
+      return data.length;
+    } else {
+      return data.length + 1;
+    }
+  }
+
   Widget _createGiphyTable(BuildContext context, AsyncSnapshot snapshot) {
     return GridView.builder(
       padding: EdgeInsets.only(bottom: 20, top: 0, right: 20, left: 20),
@@ -100,15 +117,57 @@ class _HomePageState extends State<HomePage> {
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
       ),
-      itemCount: snapshot.data["data"].length,
+      itemCount: _getCount(snapshot.data["data"]),
       itemBuilder: (context, index) {
-        return GestureDetector(
-          child: Image.network(
-            snapshot.data["data"][index]["images"]["fixed_height"]["url"],
-            height: 300,
-            fit: BoxFit.cover,
-          ),
-        );
+        if (_search == null || index < snapshot.data["data"].length)
+          return GestureDetector(
+            child: FadeInImage.memoryNetwork(
+              placeholder: kTransparentImage,
+              image: snapshot.data["data"][index]["images"]["fixed_height"]
+                  ["url"],
+              height: 300,
+              fit: BoxFit.cover,
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) =>
+                        GiphyPage(snapshot.data["data"][index])),
+              );
+            },
+            onLongPress: () {
+              Share.share(snapshot.data["data"][index]["images"]["fixed_height"]
+                  ["url"]);
+            },
+          );
+        else
+          return Container(
+            child: GestureDetector(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.add,
+                    color: Colors.white,
+                    size: 70,
+                  ),
+                  Text(
+                    "Load more...",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                    ),
+                  )
+                ],
+              ),
+              onTap: () {
+                setState(() {
+                  _offset += 9;
+                });
+              },
+            ),
+          );
       },
     );
   }
